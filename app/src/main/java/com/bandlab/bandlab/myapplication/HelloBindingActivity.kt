@@ -9,7 +9,7 @@ import com.ogaclejapan.rx.binding.Rx
 import com.ogaclejapan.rx.binding.RxProperty
 import com.ogaclejapan.rx.binding.RxView
 import rx.Observable
-import rx.android.lifecycle.LifecycleObservable
+import rx.Subscription
 import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import rx.subjects.BehaviorSubject
@@ -23,7 +23,7 @@ class HelloBindingActivity : RxActivity() {
 
     var string = RxProperty.create<String>()
     var text: Rx<TextView>? = null
-    var result = ""
+    var subscription: Subscription? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,18 +33,34 @@ class HelloBindingActivity : RxActivity() {
         TextObserver(text!!).asObservable()
                 .subscribeOn(Schedulers.newThread())
                 .observeOn(AndroidSchedulers.mainThread())
+                .cache()
                 .subscribe({ s -> Log.d("TextObserver", s) })
-        LifecycleObservable.bindActivityLifecycle(
-                lifecycle(),
-                Observable.interval(1, TimeUnit.SECONDS)
-                        .subscribeOn(Schedulers.newThread())
-                        .observeOn(AndroidSchedulers.mainThread())
-        ).subscribe({
-            string.set(currentSeconds())
-            Log.d("Second", currentSeconds())
-        })
         lifecycle().subscribe({ event -> Log.d("Event", event.toString()) })
+    }
 
+    private fun startTimer() {
+        stopTimer()
+        subscription = Observable.interval(1, TimeUnit.SECONDS)
+                .subscribeOn(Schedulers.newThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe({
+                    string.set(currentSeconds())
+                    Log.d("Second", currentSeconds())
+                })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        startTimer()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopTimer()
+    }
+
+    private fun stopTimer() {
+        subscription?.unsubscribe()
     }
 
     fun currentSeconds() = ((System.currentTimeMillis() / 1000) % 60).toString()
